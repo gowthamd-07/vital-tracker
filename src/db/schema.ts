@@ -1,0 +1,72 @@
+import {
+  date,
+  pgTable,
+  real,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+export const users = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  name: text("name").notNull(),
+  /** Height in centimeters — used for BMI */
+  heightCm: real("height_cm"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const weightEntries = pgTable(
+  "weight_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entryDate: date("entry_date").notNull(),
+    weightKg: real("weight_kg").notNull(),
+    bodyFatPercent: real("body_fat_percent"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("weight_entries_user_date_unique").on(table.userId, table.entryDate),
+  ],
+);
+
+export const habits = pgTable("habits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#6366f1"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const habitCompletions = pgTable(
+  "habit_completions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    habitId: uuid("habit_id")
+      .notNull()
+      .references(() => habits.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    completedDate: date("completed_date").notNull(),
+  },
+  (table) => [
+    uniqueIndex("habit_completions_habit_date_unique").on(
+      table.habitId,
+      table.completedDate,
+    ),
+  ],
+);
+
+export type User = typeof users.$inferSelect;
+export type WeightEntry = typeof weightEntries.$inferSelect;
+export type Habit = typeof habits.$inferSelect;
+export type HabitCompletion = typeof habitCompletions.$inferSelect;
