@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   const session = await auth();
   const profile = await getProfile();
   const weights = await getWeightEntries();
-  const { habits, completions } = await getHabitsWithCompletions(30);
+  const { habits, completions } = await getHabitsWithCompletions();
 
   const latest = weights[0];
   const height = profile?.heightCm ?? 0;

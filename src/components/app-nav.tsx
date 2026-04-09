@@ -10,6 +10,7 @@ import {
   Settings,
 } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", short: "Home", icon: BarChart3 },
@@ -33,6 +34,9 @@ export function AppNav() {
           >
             VitalTrack
           </Link>
+          <div className="flex items-center gap-1 sm:hidden">
+            <ThemeToggle />
+          </div>
           <nav className="hidden items-center gap-1 sm:flex">
             {links.map(({ href, label, icon: Icon }) => {
               const active =
@@ -52,6 +56,7 @@ export function AppNav() {
                 </Link>
               );
             })}
+            <ThemeToggle />
             <SignOutButton />
           </nav>
         </div>

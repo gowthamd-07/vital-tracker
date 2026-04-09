@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { habitCompletions, habits } from "@/db/schema";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { computeStreak, longestStreak } from "@/lib/streaks";
 
@@ -16,7 +16,7 @@ export type HabitWithStreak = {
   createdAt: Date;
 };
 
-export async function getHabitsWithCompletions(daysBack: number) {
+export async function getHabitsWithCompletions() {
   const session = await auth();
   if (!session?.user?.id)
     return { habits: [] as HabitWithStreak[], completions: [] as { habitId: string; completedDate: string }[] };
@@ -25,7 +25,7 @@ export async function getHabitsWithCompletions(daysBack: number) {
     .select()
     .from(habits)
     .where(eq(habits.userId, session.user.id))
-    .orderBy(desc(habits.createdAt));
+    .orderBy(asc(habits.color), asc(habits.name));
 
   if (habitRows.length === 0) {
     return { habits: [] as HabitWithStreak[], completions: [] };
@@ -33,23 +33,6 @@ export async function getHabitsWithCompletions(daysBack: number) {
 
   const habitIds = habitRows.map((h) => h.id);
 
-  // For the grid, restrict to `daysBack` days
-  const from = new Date();
-  from.setDate(from.getDate() - daysBack);
-  const fromStr = from.toISOString().slice(0, 10);
-
-  const recentCompletions = await db
-    .select()
-    .from(habitCompletions)
-    .where(
-      and(
-        eq(habitCompletions.userId, session.user.id),
-        inArray(habitCompletions.habitId, habitIds),
-        gte(habitCompletions.completedDate, fromStr),
-      ),
-    );
-
-  // For streaks, fetch ALL completions per habit
   const allCompletions = await db
     .select({ habitId: habitCompletions.habitId, completedDate: habitCompletions.completedDate })
     .from(habitCompletions)
@@ -82,7 +65,7 @@ export async function getHabitsWithCompletions(daysBack: number) {
 
   return {
     habits: habitsWithStreaks,
-    completions: recentCompletions.map((c) => ({
+    completions: allCompletions.map((c) => ({
       habitId: c.habitId,
       completedDate: c.completedDate,
     })),
@@ -114,7 +97,6 @@ export async function deleteHabit(id: string): Promise<void> {
 
   revalidatePath("/habits");
   revalidatePath("/dashboard");
-  revalidatePath("/data");
 }
 
 export async function toggleHabitFormAction(formData: FormData): Promise<void> {
@@ -131,35 +113,33 @@ export async function toggleHabitCompletion(
   const session = await auth();
   if (!session?.user?.id) return;
 
-  const [habit] = await db
-    .select()
-    .from(habits)
-    .where(and(eq(habits.id, habitId), eq(habits.userId, session.user.id)))
-    .limit(1);
-  if (!habit) return;
-
-  const [existing] = await db
-    .select()
-    .from(habitCompletions)
+  const deleted = await db
+    .delete(habitCompletions)
     .where(
       and(
         eq(habitCompletions.habitId, habitId),
+        eq(habitCompletions.userId, session.user.id),
         eq(habitCompletions.completedDate, completedDate),
       ),
     )
-    .limit(1);
+    .returning({ id: habitCompletions.id });
 
-  if (existing) {
-    await db.delete(habitCompletions).where(eq(habitCompletions.id, existing.id));
-  } else {
-    await db.insert(habitCompletions).values({
-      habitId,
-      userId: session.user.id,
-      completedDate,
-    });
+  if (deleted.length === 0) {
+    const [habit] = await db
+      .select({ id: habits.id })
+      .from(habits)
+      .where(and(eq(habits.id, habitId), eq(habits.userId, session.user.id)))
+      .limit(1);
+
+    if (habit) {
+      await db.insert(habitCompletions).values({
+        habitId,
+        userId: session.user.id,
+        completedDate,
+      });
+    }
   }
 
   revalidatePath("/habits");
   revalidatePath("/dashboard");
-  revalidatePath("/data");
 }
