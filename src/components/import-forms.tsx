@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function ImportCsvForms() {
+  const router = useRouter();
   const [weightsMsg, setWeightsMsg] = useState<string | null>(null);
   const [habitsMsg, setHabitsMsg] = useState<string | null>(null);
   const [loadingW, setLoadingW] = useState(false);
@@ -22,6 +24,7 @@ export function ImportCsvForms() {
       } else {
         setWeightsMsg(`Imported ${data.imported ?? 0} weight row(s).`);
         e.currentTarget.reset();
+        router.refresh();
       }
     } catch {
       setWeightsMsg("Network error.");
@@ -44,6 +47,7 @@ export function ImportCsvForms() {
       } else {
         setHabitsMsg(`Recorded ${data.imported ?? 0} habit completion(s).`);
         e.currentTarget.reset();
+        router.refresh();
       }
     } catch {
       setHabitsMsg("Network error.");
@@ -54,7 +58,7 @@ export function ImportCsvForms() {
 
   return (
     <div className="grid gap-6 sm:grid-cols-2">
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
           Import weights
         </h3>
@@ -83,7 +87,7 @@ export function ImportCsvForms() {
           )}
         </form>
       </div>
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
           Import habits
         </h3>

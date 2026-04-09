@@ -1,12 +1,15 @@
 import { getProfile } from "@/app/actions/profile";
 import { deleteWeightEntry, getWeightEntries, upsertWeightEntry } from "@/app/actions/weight";
 import { computeBmi, formatBmi, bmiLabel } from "@/lib/bmi";
-import { WeightChart } from "@/components/weight-chart";
+import { LazyWeightChart } from "@/components/lazy-weight-chart";
 import { Trash2, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import Link from "next/link";
 
 export default async function WeightPage() {
-  const profile = await getProfile();
-  const entries = await getWeightEntries();
+  const [profile, entries] = await Promise.all([
+    getProfile(),
+    getWeightEntries(),
+  ]);
   const height = profile?.heightCm ?? 0;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -37,9 +40,9 @@ export default async function WeightPage() {
           Track weight, body fat, and BMI.{" "}
           {height <= 0 && (
             <>
-              <a href="/settings" className="text-emerald-700 underline dark:text-emerald-400">
+              <Link href="/settings" className="text-emerald-700 underline dark:text-emerald-400">
                 Set your height
-              </a>{" "}
+              </Link>{" "}
               to enable BMI.
             </>
           )}
@@ -48,7 +51,7 @@ export default async function WeightPage() {
 
       {/* ── Trend summary ─────────────────────────────── */}
       {latest && (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <TrendCard
             label="Latest"
             value={`${latest.weightKg.toFixed(1)} kg`}
@@ -70,15 +73,15 @@ export default async function WeightPage() {
       )}
 
       {/* ── Chart ─────────────────────────────────────── */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-4 text-lg font-medium text-zinc-900 dark:text-zinc-50">
           Weight over time
         </h2>
-        <WeightChart data={chartData} height={300} showBodyFat />
+        <LazyWeightChart data={chartData} height={300} showBodyFat />
       </section>
 
       {/* ── Add form ──────────────────────────────────── */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
           Add or update entry
         </h2>
@@ -144,14 +147,14 @@ export default async function WeightPage() {
           History ({entries.length} entries)
         </h2>
         <div className="mt-3 overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full min-w-[36rem] text-left text-sm">
+          <table className="w-full text-left text-sm">
             <thead className="bg-zinc-100/80 dark:bg-zinc-900">
               <tr>
-                <th className="px-4 py-3 font-medium text-zinc-700 dark:text-zinc-300">Date</th>
-                <th className="px-4 py-3 font-medium text-zinc-700 dark:text-zinc-300">Weight</th>
-                <th className="px-4 py-3 font-medium text-zinc-700 dark:text-zinc-300">Body fat</th>
-                <th className="px-4 py-3 font-medium text-zinc-700 dark:text-zinc-300">BMI</th>
-                <th className="px-4 py-3 font-medium text-zinc-700 dark:text-zinc-300">Notes</th>
+                <th className="px-3 py-3 font-medium text-zinc-700 sm:px-4 dark:text-zinc-300">Date</th>
+                <th className="px-3 py-3 font-medium text-zinc-700 sm:px-4 dark:text-zinc-300">Weight</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-700 sm:table-cell dark:text-zinc-300">Body fat</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-700 sm:table-cell dark:text-zinc-300">BMI</th>
+                <th className="hidden px-4 py-3 font-medium text-zinc-700 md:table-cell dark:text-zinc-300">Notes</th>
                 <th className="w-12 px-2 py-3" />
               </tr>
             </thead>
@@ -167,14 +170,21 @@ export default async function WeightPage() {
                   const b = height > 0 ? computeBmi(row.weightKg, height) : 0;
                   return (
                     <tr key={row.id}>
-                      <td className="px-4 py-3 tabular-nums text-zinc-800 dark:text-zinc-200">
+                      <td className="px-3 py-3 tabular-nums text-zinc-800 sm:px-4 dark:text-zinc-200">
                         {row.entryDate}
                       </td>
-                      <td className="px-4 py-3 tabular-nums">{row.weightKg.toFixed(1)} kg</td>
-                      <td className="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-400">
+                      <td className="px-3 py-3 tabular-nums sm:px-4">
+                        {row.weightKg.toFixed(1)} kg
+                        <span className="mt-0.5 block text-[11px] text-zinc-500 sm:hidden">
+                          {row.bodyFatPercent != null && `${row.bodyFatPercent.toFixed(1)}% BF`}
+                          {height > 0 && row.bodyFatPercent != null && " · "}
+                          {height > 0 && `BMI ${formatBmi(b)}`}
+                        </span>
+                      </td>
+                      <td className="hidden px-4 py-3 tabular-nums text-zinc-600 sm:table-cell dark:text-zinc-400">
                         {row.bodyFatPercent != null ? `${row.bodyFatPercent.toFixed(1)}%` : "—"}
                       </td>
-                      <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                      <td className="hidden px-4 py-3 text-zinc-700 sm:table-cell dark:text-zinc-300">
                         {height > 0 ? (
                           <>
                             {formatBmi(b)}
@@ -182,7 +192,7 @@ export default async function WeightPage() {
                           </>
                         ) : "—"}
                       </td>
-                      <td className="max-w-[12rem] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      <td className="hidden max-w-[12rem] truncate px-4 py-3 text-zinc-600 md:table-cell dark:text-zinc-400">
                         {row.notes ?? "—"}
                       </td>
                       <td className="px-2 py-3">
@@ -220,13 +230,13 @@ function TrendCard({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</span>
-      <div className="mt-1 flex items-center gap-2">
-        <span className="text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">{value}</span>
+    <div className="rounded-xl border border-zinc-200 bg-white p-3 sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 sm:text-xs">{label}</span>
+      <div className="mt-1 flex items-center gap-1.5 sm:gap-2">
+        <span className="text-base font-semibold tabular-nums text-zinc-900 sm:text-xl dark:text-zinc-50">{value}</span>
         {icon}
       </div>
-      <span className="text-xs text-zinc-500">{sub}</span>
+      <span className="text-[10px] text-zinc-500 sm:text-xs">{sub}</span>
     </div>
   );
 }

@@ -77,11 +77,12 @@ export function WeightChart({
           <Tooltip
             contentStyle={{
               borderRadius: 12,
-              border: "none",
+              border: "1px solid var(--color-zinc-200, #e4e4e7)",
               boxShadow: "0 4px 24px rgba(0,0,0,.12)",
               fontSize: 13,
               padding: "10px 14px",
-              backgroundColor: "rgba(255,255,255,0.97)",
+              backgroundColor: "var(--background)",
+              color: "var(--foreground)",
             }}
             formatter={(value, name) => {
               const v = typeof value === "number" ? value.toFixed(1) : String(value ?? "");
@@ -90,7 +91,7 @@ export function WeightChart({
                 : [`${v}%`, "Body fat"];
             }}
             labelFormatter={(label) => String(label)}
-            cursor={{ stroke: "#d4d4d8", strokeDasharray: "4 4" }}
+            cursor={{ stroke: "#a1a1aa", strokeDasharray: "4 4" }}
           />
           <ReferenceLine
             y={avg}
@@ -105,7 +106,7 @@ export function WeightChart({
             strokeWidth={2.5}
             fill="url(#weightGrad)"
             dot={{ r: 3, fill: "#059669", strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: "#059669", stroke: "#fff", strokeWidth: 2 }}
+            activeDot={{ r: 5, fill: "#059669", stroke: "var(--background)", strokeWidth: 2 }}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -144,18 +145,19 @@ export function WeightChart({
             <Tooltip
               contentStyle={{
                 borderRadius: 12,
-                border: "none",
+                border: "1px solid var(--color-zinc-200, #e4e4e7)",
                 boxShadow: "0 4px 24px rgba(0,0,0,.12)",
                 fontSize: 12,
                 padding: "8px 12px",
-                backgroundColor: "rgba(255,255,255,0.97)",
+                backgroundColor: "var(--background)",
+                color: "var(--foreground)",
               }}
               formatter={(value) => {
                 const v = typeof value === "number" ? value.toFixed(1) : String(value ?? "");
                 return [`${v}%`, "Body fat"];
               }}
               labelFormatter={(label) => String(label)}
-              cursor={{ stroke: "#d4d4d8", strokeDasharray: "4 4" }}
+              cursor={{ stroke: "#a1a1aa", strokeDasharray: "4 4" }}
             />
             <Line
               type="monotone"
@@ -163,7 +165,7 @@ export function WeightChart({
               stroke="#8b5cf6"
               strokeWidth={2}
               dot={{ r: 2, fill: "#8b5cf6", strokeWidth: 0 }}
-              activeDot={{ r: 4, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: "#8b5cf6", stroke: "var(--background)", strokeWidth: 2 }}
               connectNulls
             />
           </LineChart>

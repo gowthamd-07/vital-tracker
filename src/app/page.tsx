@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Activity, CheckSquare, Shield } from "lucide-react";
+import { AppLogo } from "@/components/app-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,7 @@ export default async function HomePage() {
     <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b border-zinc-200 bg-white/90 dark:border-zinc-800 dark:bg-zinc-950/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-            VitalTrack
-          </span>
+          <AppLogo />
           <div className="flex gap-3">
             <Link
               href="/login"

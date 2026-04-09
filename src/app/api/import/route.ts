@@ -2,9 +2,12 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { habitCompletions, habits, weightEntries } from "@/db/schema";
 import { parseCsv } from "@/lib/csv";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB
+const BATCH_SIZE = 100;
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -18,6 +21,13 @@ export async function POST(req: Request) {
 
   if (!file || !(file instanceof File)) {
     return Response.json({ error: "Missing file." }, { status: 400 });
+  }
+
+  if (file.size > MAX_FILE_BYTES) {
+    return Response.json(
+      { error: "File too large. Maximum size is 2 MB." },
+      { status: 400 },
+    );
   }
 
   const text = await file.text();
@@ -69,7 +79,14 @@ async function importWeights(
   const iBf = idx(header, "body_fat_percent", "body_fat", "fat");
   const iNotes = idx(header, "notes", "note");
 
-  let n = 0;
+  const values: {
+    userId: string;
+    entryDate: string;
+    weightKg: number;
+    bodyFatPercent: number | null;
+    notes: string | null;
+  }[] = [];
+
   for (const row of dataRows) {
     const dateStr = row[iDate]?.trim();
     const wStr = row[iWeight]?.trim();
@@ -85,15 +102,13 @@ async function importWeights(
     const notes =
       iNotes >= 0 && row[iNotes]?.trim() ? row[iNotes]!.trim() : null;
 
+    values.push({ userId, entryDate: dateStr, weightKg, bodyFatPercent, notes });
+  }
+
+  for (let i = 0; i < values.length; i += BATCH_SIZE) {
     await db
       .insert(weightEntries)
-      .values({
-        userId,
-        entryDate: dateStr,
-        weightKg,
-        bodyFatPercent,
-        notes,
-      })
+      .values(values.slice(i, i + BATCH_SIZE))
       .onConflictDoUpdate({
         target: [weightEntries.userId, weightEntries.entryDate],
         set: {
@@ -102,13 +117,12 @@ async function importWeights(
           notes: sql`excluded.notes`,
         },
       });
-    n++;
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/weight");
   revalidatePath("/data");
-  return Response.json({ ok: true, imported: n });
+  return Response.json({ ok: true, imported: values.length });
 }
 
 function parseBool(s: string): boolean {
@@ -136,56 +150,93 @@ async function importHabits(
     );
   }
 
-  const habitCache = new Map<string, string>();
+  // Collect unique habit names and their colors from CSV
+  const nameColorMap = new Map<string, string>();
+  const parsed: { name: string; date: string; done: boolean; color: string }[] = [];
 
-  async function habitIdForName(name: string, color: string) {
-    const key = name.toLowerCase();
-    if (habitCache.has(key)) return habitCache.get(key)!;
-    const [existing] = await db
-      .select()
-      .from(habits)
-      .where(and(eq(habits.userId, userId), eq(habits.name, name)))
-      .limit(1);
-    if (existing) {
-      habitCache.set(key, existing.id);
-      return existing.id;
-    }
-    const [created] = await db
-      .insert(habits)
-      .values({ userId, name, color: color || "#6366f1" })
-      .returning({ id: habits.id });
-    habitCache.set(key, created!.id);
-    return created!.id;
-  }
-
-  let completions = 0;
   for (const row of dataRows) {
     const name = row[iName]?.trim();
     const dateStr = row[iDate]?.trim();
     if (!name || !dateStr) continue;
 
     const color = iColor >= 0 ? (row[iColor]?.trim() ?? "#6366f1") : "#6366f1";
-    const done =
-      iDone < 0 ? true : parseBool(row[iDone] ?? "yes");
+    const done = iDone < 0 ? true : parseBool(row[iDone] ?? "yes");
 
-    const hid = await habitIdForName(name, color);
-    if (!done) continue;
+    if (!nameColorMap.has(name.toLowerCase())) {
+      nameColorMap.set(name.toLowerCase(), color);
+    }
+    parsed.push({ name, date: dateStr, done, color });
+  }
 
+  // Resolve all habit IDs in bulk: fetch existing, create missing
+  const uniqueNames = [...new Set(parsed.map((p) => p.name))];
+
+  const existingHabits =
+    uniqueNames.length > 0
+      ? await db
+          .select({ id: habits.id, name: habits.name })
+          .from(habits)
+          .where(
+            and(
+              eq(habits.userId, userId),
+              inArray(habits.name, uniqueNames),
+            ),
+          )
+      : [];
+
+  const habitIdByName = new Map<string, string>();
+  for (const h of existingHabits) {
+    habitIdByName.set(h.name.toLowerCase(), h.id);
+  }
+
+  const missingNames = uniqueNames.filter(
+    (n) => !habitIdByName.has(n.toLowerCase()),
+  );
+
+  if (missingNames.length > 0) {
+    const newHabits = missingNames.map((name) => ({
+      userId,
+      name,
+      color: nameColorMap.get(name.toLowerCase()) || "#6366f1",
+    }));
+
+    for (let i = 0; i < newHabits.length; i += BATCH_SIZE) {
+      const created = await db
+        .insert(habits)
+        .values(newHabits.slice(i, i + BATCH_SIZE))
+        .returning({ id: habits.id, name: habits.name });
+
+      for (const h of created) {
+        habitIdByName.set(h.name.toLowerCase(), h.id);
+      }
+    }
+  }
+
+  // Batch insert completions
+  const completionValues: {
+    habitId: string;
+    userId: string;
+    completedDate: string;
+  }[] = [];
+
+  for (const p of parsed) {
+    if (!p.done) continue;
+    const hid = habitIdByName.get(p.name.toLowerCase());
+    if (!hid) continue;
+    completionValues.push({ habitId: hid, userId, completedDate: p.date });
+  }
+
+  for (let i = 0; i < completionValues.length; i += BATCH_SIZE) {
     await db
       .insert(habitCompletions)
-      .values({
-        habitId: hid,
-        userId,
-        completedDate: dateStr,
-      })
+      .values(completionValues.slice(i, i + BATCH_SIZE))
       .onConflictDoNothing({
         target: [habitCompletions.habitId, habitCompletions.completedDate],
       });
-    completions++;
   }
 
   revalidatePath("/habits");
   revalidatePath("/dashboard");
   revalidatePath("/data");
-  return Response.json({ ok: true, imported: completions });
+  return Response.json({ ok: true, imported: completionValues.length });
 }

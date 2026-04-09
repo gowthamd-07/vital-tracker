@@ -3,27 +3,26 @@ import { getProfile } from "@/app/actions/profile";
 import { getWeightEntries } from "@/app/actions/weight";
 import { getHabitsWithCompletions } from "@/app/actions/habits";
 import { computeBmi, formatBmi, bmiLabel } from "@/lib/bmi";
-import { WeightChart } from "@/components/weight-chart";
-import { toggleHabitFormAction } from "@/app/actions/habits";
+import { LazyWeightChart } from "@/components/lazy-weight-chart";
+import { DashboardHabits } from "@/components/dashboard-habits";
 import Link from "next/link";
-import { Flame, TrendingDown, TrendingUp, Minus, Scale, Activity } from "lucide-react";
+import { TrendingDown, TrendingUp, Minus, Scale, Activity } from "lucide-react";
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const profile = await getProfile();
-  const weights = await getWeightEntries();
-  const { habits, completions } = await getHabitsWithCompletions();
+  const [session, profile, weights, { habits, completions }] =
+    await Promise.all([
+      auth(),
+      getProfile(),
+      getWeightEntries(),
+      getHabitsWithCompletions(),
+    ]);
 
   const latest = weights[0];
   const height = profile?.heightCm ?? 0;
   const bmi = latest && height > 0 ? computeBmi(latest.weightKg, height) : 0;
 
   const today = new Date().toISOString().slice(0, 10);
-  const doneToday = new Set(
-    completions.filter((c) => c.completedDate === today).map((c) => c.habitId),
-  );
 
-  // Weight trends
   const d7 = new Date(); d7.setDate(d7.getDate() - 7);
   const d30 = new Date(); d30.setDate(d30.getDate() - 30);
   const d7Str = d7.toISOString().slice(0, 10);
@@ -56,7 +55,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Stats cards ─────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Current weight"
           value={latest ? `${latest.weightKg.toFixed(1)} kg` : "—"}
@@ -94,77 +93,18 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Weight chart ────────────────────────────────── */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Weight trend</h2>
           <Link href="/weight" className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400">
             View all &rarr;
           </Link>
         </div>
-        <WeightChart data={chartData} showBodyFat />
+        <LazyWeightChart data={chartData} showBodyFat />
       </section>
 
-      {/* ── Today's habits ──────────────────────────────── */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Today&apos;s habits</h2>
-          <Link href="/habits" className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400">
-            Manage &rarr;
-          </Link>
-        </div>
-        {habits.length === 0 ? (
-          <p className="text-zinc-600 dark:text-zinc-400">
-            No habits yet.{" "}
-            <Link href="/habits" className="font-medium text-emerald-700 underline dark:text-emerald-400">
-              Create one
-            </Link>
-          </p>
-        ) : (
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {habits.map((h) => {
-              const done = doneToday.has(h.id);
-              return (
-                <li key={h.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <form action={toggleHabitFormAction}>
-                      <input type="hidden" name="habitId" value={h.id} />
-                      <input type="hidden" name="completedDate" value={today} />
-                      <button
-                        type="submit"
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition ${
-                          done
-                            ? "bg-emerald-500 text-white shadow-inner"
-                            : "border border-zinc-300 bg-white text-zinc-400 hover:border-emerald-400 dark:border-zinc-600 dark:bg-zinc-950"
-                        }`}
-                        aria-label={`Toggle ${h.name}`}
-                      >
-                        {done ? "✓" : ""}
-                      </button>
-                    </form>
-                    <span
-                      className="truncate font-medium text-zinc-800 dark:text-zinc-200"
-                      style={{ borderLeftWidth: 3, borderLeftColor: h.color, paddingLeft: 8 }}
-                    >
-                      {h.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {h.currentStreak > 0 && (
-                      <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                        <Flame className="h-3.5 w-3.5" />
-                        {h.currentStreak}d
-                      </span>
-                    )}
-                    <span className={done ? "font-medium text-emerald-600 dark:text-emerald-400" : "text-zinc-400"}>
-                      {done ? "Done" : "—"}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      {/* ── Today's habits (optimistic client component) ── */}
+      <DashboardHabits habits={habits} completions={completions} today={today} />
     </div>
   );
 }
@@ -181,17 +121,17 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 sm:text-xs dark:text-zinc-400">
           {label}
         </span>
         {icon}
       </div>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
+      <p className="mt-1.5 text-xl font-semibold tabular-nums text-zinc-900 sm:mt-2 sm:text-2xl dark:text-zinc-50">
         {value}
       </p>
-      <p className="mt-0.5 text-xs text-zinc-500">{sub}</p>
+      <p className="mt-0.5 text-[11px] text-zinc-500 sm:text-xs">{sub}</p>
     </div>
   );
 }

@@ -76,7 +76,7 @@ export function HabitsTracker({ habits, completions, days }: Props) {
         </h1>
         <p className="mt-1 text-zinc-600 dark:text-zinc-400">
           {habits.length > 0
-            ? `${doneToday} of ${habits.length} completed today. Tap a cell to toggle.`
+            ? `${doneToday} of ${habits.length} completed today. Tap to toggle.`
             : "Create your first habit below."}
         </p>
       </div>
@@ -128,7 +128,7 @@ export function HabitsTracker({ habits, completions, days }: Props) {
 
       {habits.length === 0 ? (
         <p className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-zinc-500 dark:border-zinc-700">
-          No habits yet. Add one above.
+          No habits yet. Create one below.
         </p>
       ) : (
         <section className="overflow-x-auto">
@@ -189,7 +189,7 @@ export function HabitsTracker({ habits, completions, days }: Props) {
                           <button
                             type="button"
                             onClick={() => handleToggle(h.id, d)}
-                            className={`h-9 w-full min-w-[2rem] rounded-lg text-xs font-medium transition ${
+                            className={`h-10 w-full min-w-[2.25rem] rounded-lg text-xs font-medium transition ${
                               isOn
                                 ? "bg-emerald-500 text-white shadow-inner hover:bg-emerald-600"
                                 : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
@@ -295,16 +295,16 @@ function YearHeatmap({
   const dayLabels = ["M", "", "W", "", "F", "", "S"];
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-medium text-zinc-900 dark:text-zinc-50">
+    <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="flex items-center gap-2 text-base font-medium text-zinc-900 sm:text-lg dark:text-zinc-50">
           <span
-            className="inline-block h-3 w-3 rounded-sm"
+            className="inline-block h-3 w-3 shrink-0 rounded-sm"
             style={{ backgroundColor: habit.color }}
           />
           {habit.name} — Year in review
         </h2>
-        <div className="flex items-center gap-4 text-xs text-zinc-500">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500 sm:gap-4">
           <span>
             <strong className="text-zinc-900 dark:text-zinc-100">
               {completedDays}

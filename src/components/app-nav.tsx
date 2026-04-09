@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppLogo } from "@/components/app-logo";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", short: "Home", icon: BarChart3 },
@@ -28,11 +29,8 @@ export function AppNav() {
     <>
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <Link
-            href="/dashboard"
-            className="font-semibold tracking-tight text-emerald-700 dark:text-emerald-400"
-          >
-            VitalTrack
+          <Link href="/dashboard">
+            <AppLogo />
           </Link>
           <div className="flex items-center gap-1 sm:hidden">
             <ThemeToggle />
@@ -61,16 +59,16 @@ export function AppNav() {
           </nav>
         </div>
       </header>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-1 dark:border-zinc-800 dark:bg-zinc-950/95 sm:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] dark:border-zinc-800 dark:bg-zinc-950/95 sm:hidden">
         <div className="mx-auto flex w-full max-w-lg justify-around">
-          {links.map(({ href, label, short, icon: Icon }) => {
+          {links.map(({ href, short, icon: Icon }) => {
             const active =
               currentPath === href || currentPath.startsWith(`${href}/`);
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium ${
+                className={`flex flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[11px] font-medium ${
                   active
                     ? "text-emerald-700 dark:text-emerald-400"
                     : "text-zinc-500 dark:text-zinc-500"
@@ -83,7 +81,7 @@ export function AppNav() {
           })}
         </div>
       </nav>
-      <div className="h-16 sm:hidden" aria-hidden />
+      <div className="h-[4.5rem] sm:hidden" aria-hidden />
     </>
   );
 }

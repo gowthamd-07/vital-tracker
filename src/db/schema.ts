@@ -1,5 +1,6 @@
 import {
   date,
+  index,
   pgTable,
   real,
   text,
@@ -36,15 +37,19 @@ export const weightEntries = pgTable(
   ],
 );
 
-export const habits = pgTable("habits", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  color: text("color").notNull().default("#6366f1"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const habits = pgTable(
+  "habits",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    color: text("color").notNull().default("#6366f1"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("habits_user_idx").on(table.userId)],
+);
 
 export const habitCompletions = pgTable(
   "habit_completions",
@@ -63,6 +68,7 @@ export const habitCompletions = pgTable(
       table.habitId,
       table.completedDate,
     ),
+    index("habit_completions_user_idx").on(table.userId),
   ],
 );
 
