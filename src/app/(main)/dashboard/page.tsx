@@ -79,7 +79,12 @@ export default async function DashboardPage() {
           Hello, {session?.user?.name?.split(" ")[0] ?? "there"}
         </h1>
         <p className="mt-1 text-zinc-600 dark:text-zinc-400">
-          Your health snapshot for today.
+          {new Date(today + "T00:00:00").toLocaleDateString("en-IN", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })}
         </p>
       </div>
 

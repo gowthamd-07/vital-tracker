@@ -232,6 +232,11 @@ export function HabitsTracker({ habits, completions, days }: Props) {
   );
 }
 
+type MonthGroup = {
+  label: string;
+  weeks: (string | null)[][];
+};
+
 function YearHeatmap({
   habit,
   completionSet,
@@ -239,7 +244,7 @@ function YearHeatmap({
   habit: HabitWithStreak;
   completionSet: Set<string>;
 }) {
-  const { weeks, months, totalDays, completedDays } = useMemo(() => {
+  const { monthGroups, totalDays, completedDays } = useMemo(() => {
     const today = new Date();
     const start = new Date(today);
     start.setFullYear(start.getFullYear() - 1);
@@ -249,7 +254,7 @@ function YearHeatmap({
       start.setDate(start.getDate() - 1);
     }
 
-    const ws: (string | null)[][] = [];
+    const allWeeks: (string | null)[][] = [];
     const current = new Date(start);
     let total = 0;
     let completed = 0;
@@ -267,18 +272,18 @@ function YearHeatmap({
         }
         current.setDate(current.getDate() + 1);
       }
-      ws.push(week);
+      allWeeks.push(week);
     }
 
-    const ms: { label: string; col: number }[] = [];
+    const monthBounds: { label: string; col: number }[] = [];
     let lastMonth = -1;
-    ws.forEach((week, i) => {
+    allWeeks.forEach((week, i) => {
       const firstDay = week.find((d) => d != null);
       if (firstDay) {
         const month = new Date(firstDay).getMonth();
         if (month !== lastMonth) {
-          ms.push({
-            label: new Date(firstDay).toLocaleDateString(undefined, {
+          monthBounds.push({
+            label: new Date(firstDay).toLocaleDateString("en-IN", {
               month: "short",
             }),
             col: i,
@@ -288,7 +293,13 @@ function YearHeatmap({
       }
     });
 
-    return { weeks: ws, months: ms, totalDays: total, completedDays: completed };
+    const groups: MonthGroup[] = monthBounds.map((m, i) => {
+      const endCol =
+        i + 1 < monthBounds.length ? monthBounds[i + 1]!.col : allWeeks.length;
+      return { label: m.label, weeks: allWeeks.slice(m.col, endCol) };
+    });
+
+    return { monthGroups: groups, totalDays: total, completedDays: completed };
   }, [habit.id, completionSet]);
 
   const pct = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
@@ -323,7 +334,8 @@ function YearHeatmap({
       </div>
 
       <div className="overflow-x-auto">
-        <div className="inline-flex gap-0.5">
+        <div className="inline-flex">
+          {/* Day-of-week labels */}
           <div className="flex flex-col gap-0.5 pr-1 pt-5">
             {dayLabels.map((label, i) => (
               <div
@@ -335,53 +347,50 @@ function YearHeatmap({
             ))}
           </div>
 
-          <div>
-            <div className="mb-0.5 flex gap-0.5">
-              {months.map((m, i) => {
-                const nextCol = months[i + 1]?.col ?? weeks.length;
-                const span = nextCol - m.col;
-                return (
-                  <div
-                    key={`${m.label}-${m.col}`}
-                    className="text-[10px] leading-none text-zinc-400"
-                    style={{ width: span * 13.5 }}
-                  >
-                    {m.label}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex gap-0.5">
-              {weeks.map((week, wi) => (
-                <div key={wi} className="flex flex-col gap-0.5">
-                  {week.map((day, di) => {
-                    if (day == null) {
-                      return (
-                        <div key={di} className="h-[13px] w-[13px]" />
-                      );
-                    }
-                    const isCompleted = completionSet.has(
-                      `${habit.id}|${day}`,
-                    );
-                    return (
-                      <div
-                        key={day}
-                        className="h-[13px] w-[13px] rounded-[2px] transition-colors"
-                        style={{
-                          backgroundColor: isCompleted
-                            ? habit.color
-                            : undefined,
-                        }}
-                        data-empty={!isCompleted ? "" : undefined}
-                        title={`${day}${isCompleted ? " ✓" : ""}`}
-                      />
-                    );
-                  })}
+          {/* Month groups separated by pipes */}
+          {monthGroups.map((group, gi) => (
+            <div key={gi} className="flex">
+              {gi > 0 && (
+                <div className="mx-1 flex flex-col items-center pt-5">
+                  <div className="h-full w-px bg-zinc-300 dark:bg-zinc-600" />
                 </div>
-              ))}
+              )}
+              <div>
+                <div className="mb-0.5 text-[10px] leading-none text-zinc-400">
+                  {group.label}
+                </div>
+                <div className="flex gap-0.5">
+                  {group.weeks.map((week, wi) => (
+                    <div key={wi} className="flex flex-col gap-0.5">
+                      {week.map((day, di) => {
+                        if (day == null) {
+                          return (
+                            <div key={di} className="h-[13px] w-[13px]" />
+                          );
+                        }
+                        const isCompleted = completionSet.has(
+                          `${habit.id}|${day}`,
+                        );
+                        return (
+                          <div
+                            key={day}
+                            className="h-[13px] w-[13px] rounded-[2px] transition-colors"
+                            style={{
+                              backgroundColor: isCompleted
+                                ? habit.color
+                                : undefined,
+                            }}
+                            data-empty={!isCompleted ? "" : undefined}
+                            title={`${day}${isCompleted ? " ✓" : ""}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
