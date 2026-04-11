@@ -16,8 +16,12 @@ export async function getProfile() {
       email: users.email,
       name: users.name,
       heightCm: users.heightCm,
+      dateOfBirth: users.dateOfBirth,
+      gender: users.gender,
+      activityLevel: users.activityLevel,
       targetWeightKg: users.targetWeightKg,
       targetDate: users.targetDate,
+      createdAt: users.createdAt,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
@@ -32,6 +36,9 @@ export async function updateProfile(formData: FormData): Promise<void> {
 
   const name = String(formData.get("name") ?? "").trim();
   const heightRaw = String(formData.get("heightCm") ?? "").trim();
+  const dobRaw = String(formData.get("dateOfBirth") ?? "").trim();
+  const genderRaw = String(formData.get("gender") ?? "").trim();
+  const activityRaw = String(formData.get("activityLevel") ?? "").trim();
   const targetWeightRaw = String(formData.get("targetWeightKg") ?? "").trim();
   const targetDateRaw = String(formData.get("targetDate") ?? "").trim();
 
@@ -44,6 +51,14 @@ export async function updateProfile(formData: FormData): Promise<void> {
     heightCm = h;
   }
 
+  const dateOfBirth: string | null = dobRaw || null;
+  const gender: string | null =
+    genderRaw === "male" || genderRaw === "female" ? genderRaw : null;
+  const validActivity = ["sedentary", "light", "moderate", "active", "very_active"];
+  const activityLevel: string | null = validActivity.includes(activityRaw)
+    ? activityRaw
+    : null;
+
   let targetWeightKg: number | null = null;
   if (targetWeightRaw) {
     const tw = parseFloat(targetWeightRaw);
@@ -55,7 +70,7 @@ export async function updateProfile(formData: FormData): Promise<void> {
 
   await db
     .update(users)
-    .set({ name, heightCm, targetWeightKg, targetDate })
+    .set({ name, heightCm, dateOfBirth, gender, activityLevel, targetWeightKg, targetDate })
     .where(eq(users.id, session.user.id));
 
   revalidatePath("/settings");

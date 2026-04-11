@@ -1,14 +1,28 @@
 import { auth } from "@/auth";
 import { getProfile } from "@/app/actions/profile";
-import { getWeightEntries } from "@/app/actions/weight";
+import { getWeightEntries, upsertWeightEntry } from "@/app/actions/weight";
 import { getHabitsWithCompletions } from "@/app/actions/habits";
 import { computeBmi, formatBmi, bmiLabel } from "@/lib/bmi";
+import { computeHealthMetrics } from "@/lib/health";
+import type { Gender, ActivityLevel } from "@/lib/health";
 import { LazyWeightChart } from "@/components/lazy-weight-chart";
 import { DashboardHabits } from "@/components/dashboard-habits";
+import { QuickLog } from "@/components/quick-log";
+import { OnboardingChecklist } from "@/components/onboarding";
+import { HealthMetricsPanel, HealthMetricsEmpty } from "@/components/health-metrics";
+import { ProgressCard } from "@/components/progress-card";
 import Link from "next/link";
-import { todayIST, nowIST } from "@/lib/dates";
+import { todayIST, nowIST, daysBetween } from "@/lib/dates";
 import { analyzeGoal } from "@/lib/motivation";
-import { TrendingDown, TrendingUp, Minus, Scale, Activity, Target, Zap } from "lucide-react";
+import {
+  TrendingDown,
+  TrendingUp,
+  Minus,
+  Scale,
+  Activity,
+  Target,
+  Zap,
+} from "lucide-react";
 
 export default async function DashboardPage() {
   const [session, profile, weights, { habits, completions }] =
@@ -24,18 +38,23 @@ export default async function DashboardPage() {
   const bmi = latest && height > 0 ? computeBmi(latest.weightKg, height) : 0;
 
   const today = todayIST();
+  const hasLoggedToday = latest?.entryDate === today;
 
   const ist = nowIST();
-  const d7 = new Date(ist); d7.setDate(d7.getDate() - 7);
-  const d30 = new Date(ist); d30.setDate(d30.getDate() - 30);
+  const d7 = new Date(ist);
+  d7.setDate(d7.getDate() - 7);
+  const d30 = new Date(ist);
+  d30.setDate(d30.getDate() - 30);
   const d7Str = d7.toISOString().slice(0, 10);
   const d30Str = d30.toISOString().slice(0, 10);
 
   const weight7 = weights.find((w) => w.entryDate <= d7Str);
   const weight30 = weights.find((w) => w.entryDate <= d30Str);
 
-  const change7 = latest && weight7 ? latest.weightKg - weight7.weightKg : null;
-  const change30 = latest && weight30 ? latest.weightKg - weight30.weightKg : null;
+  const change7 =
+    latest && weight7 ? latest.weightKg - weight7.weightKg : null;
+  const change30 =
+    latest && weight30 ? latest.weightKg - weight30.weightKg : null;
 
   const chartData = weights
     .slice(0, 30)
@@ -72,6 +91,39 @@ export default async function DashboardPage() {
             ? "red"
             : "zinc";
 
+  // Health metrics
+  const hasFullProfile =
+    !!profile?.dateOfBirth && !!profile?.gender && !!profile?.activityLevel;
+  const healthMetrics =
+    hasFullProfile && latest && height > 0
+      ? computeHealthMetrics({
+          weightKg: latest.weightKg,
+          heightCm: height,
+          dateOfBirth: profile.dateOfBirth!,
+          gender: profile.gender as Gender,
+          activityLevel: profile.activityLevel as ActivityLevel,
+          targetWeightKg,
+          daysLeft:
+            targetDate ? daysBetween(today, targetDate) : null,
+        })
+      : null;
+
+  // Onboarding state
+  const hasHeight = height > 0;
+  const hasWeight = weights.length > 0;
+  const hasHabits = habits.length > 0;
+  const showOnboarding = !hasHeight || !hasWeight || !hasGoal || !hasHabits || !hasFullProfile;
+
+  // Progress card data
+  const daysTracking = profile?.createdAt
+    ? Math.max(1, daysBetween(profile.createdAt.toISOString().slice(0, 10), today))
+    : 0;
+  const totalChange =
+    oldestWeight && latest && weights.length > 1
+      ? latest.weightKg - oldestWeight.weightKg
+      : null;
+  const bestStreak = Math.max(0, ...habits.map((h) => h.bestStreak));
+
   return (
     <div className="space-y-8">
       <div>
@@ -88,7 +140,21 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* ── Weight goal motivation ────────────────────────── */}
+      {/* ── Onboarding checklist ──────────────────────── */}
+      {showOnboarding && (
+        <OnboardingChecklist
+          hasHeight={hasHeight}
+          hasWeight={hasWeight}
+          hasGoal={hasGoal}
+          hasHabits={hasHabits}
+          hasProfile={hasFullProfile}
+        />
+      )}
+
+      {/* ── Quick log today's weight ─────────────────── */}
+      <QuickLog today={today} action={upsertWeightEntry} hasToday={hasLoggedToday} />
+
+      {/* ── Weight goal motivation ────────────────────── */}
       {hasGoal && goal ? (
         <section
           className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${
@@ -151,7 +217,7 @@ export default async function DashboardPage() {
             </div>
           </div>
         </section>
-      ) : (
+      ) : !hasGoal ? (
         <section className="rounded-2xl border border-dashed border-zinc-300 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
           <div className="flex items-center gap-3">
             <Target className="h-5 w-5 text-zinc-400" />
@@ -171,9 +237,9 @@ export default async function DashboardPage() {
             </div>
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* ── Stats cards ─────────────────────────────────── */}
+      {/* ── Stats cards ─────────────────────────────── */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Current weight"
@@ -184,46 +250,121 @@ export default async function DashboardPage() {
         <StatCard
           label="BMI"
           value={bmi > 0 ? formatBmi(bmi) : "—"}
-          sub={bmi > 0 ? bmiLabel(bmi) : height <= 0 ? "Set height in Settings" : "Log a weight first"}
+          sub={
+            bmi > 0
+              ? bmiLabel(bmi)
+              : height <= 0
+                ? "Set height in Settings"
+                : "Log a weight first"
+          }
           icon={<Activity className="h-5 w-5 text-violet-600" />}
         />
         <StatCard
           label="7-day change"
-          value={change7 != null ? `${change7 > 0 ? "+" : ""}${change7.toFixed(1)} kg` : "—"}
-          sub={change7 != null ? (change7 < 0 ? "Losing weight" : change7 > 0 ? "Gaining weight" : "Stable") : "Need more data"}
-          icon={change7 != null && change7 < 0
-            ? <TrendingDown className="h-5 w-5 text-green-600" />
-            : change7 != null && change7 > 0
-              ? <TrendingUp className="h-5 w-5 text-red-500" />
-              : <Minus className="h-5 w-5 text-zinc-400" />
+          value={
+            change7 != null
+              ? `${change7 > 0 ? "+" : ""}${change7.toFixed(1)} kg`
+              : "—"
+          }
+          sub={
+            change7 != null
+              ? change7 < 0
+                ? "Losing weight"
+                : change7 > 0
+                  ? "Gaining weight"
+                  : "Stable"
+              : "Need more data"
+          }
+          icon={
+            change7 != null && change7 < 0 ? (
+              <TrendingDown className="h-5 w-5 text-green-600" />
+            ) : change7 != null && change7 > 0 ? (
+              <TrendingUp className="h-5 w-5 text-red-500" />
+            ) : (
+              <Minus className="h-5 w-5 text-zinc-400" />
+            )
           }
         />
         <StatCard
           label="30-day change"
-          value={change30 != null ? `${change30 > 0 ? "+" : ""}${change30.toFixed(1)} kg` : "—"}
-          sub={change30 != null ? (change30 < 0 ? "Losing weight" : change30 > 0 ? "Gaining weight" : "Stable") : "Need more data"}
-          icon={change30 != null && change30 < 0
-            ? <TrendingDown className="h-5 w-5 text-green-600" />
-            : change30 != null && change30 > 0
-              ? <TrendingUp className="h-5 w-5 text-red-500" />
-              : <Minus className="h-5 w-5 text-zinc-400" />
+          value={
+            change30 != null
+              ? `${change30 > 0 ? "+" : ""}${change30.toFixed(1)} kg`
+              : "—"
+          }
+          sub={
+            change30 != null
+              ? change30 < 0
+                ? "Losing weight"
+                : change30 > 0
+                  ? "Gaining weight"
+                  : "Stable"
+              : "Need more data"
+          }
+          icon={
+            change30 != null && change30 < 0 ? (
+              <TrendingDown className="h-5 w-5 text-green-600" />
+            ) : change30 != null && change30 > 0 ? (
+              <TrendingUp className="h-5 w-5 text-red-500" />
+            ) : (
+              <Minus className="h-5 w-5 text-zinc-400" />
+            )
           }
         />
       </div>
 
-      {/* ── Weight chart ────────────────────────────────── */}
+      {/* ── Health insights ─────────────────────────── */}
+      {healthMetrics ? (
+        <HealthMetricsPanel metrics={healthMetrics} />
+      ) : (
+        <HealthMetricsEmpty />
+      )}
+
+      {/* ── Weight chart ────────────────────────────── */}
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Weight trend</h2>
-          <Link href="/weight" className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+            Weight trend
+          </h2>
+          <Link
+            href="/weight"
+            className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+          >
             View all &rarr;
           </Link>
         </div>
-        <LazyWeightChart data={chartData} showBodyFat targetWeight={targetWeightKg ?? undefined} />
+        <LazyWeightChart
+          data={chartData}
+          showBodyFat
+          targetWeight={targetWeightKg ?? undefined}
+        />
       </section>
 
-      {/* ── Today's habits (optimistic client component) ── */}
+      {/* ── Today's habits ──────────────────────────── */}
       <DashboardHabits habits={habits} completions={completions} today={today} />
+
+      {/* ── Shareable progress card ─────────────────── */}
+      {hasWeight && (
+        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="mb-4 text-lg font-medium text-zinc-900 dark:text-zinc-50">
+            Share your progress
+          </h2>
+          <ProgressCard
+            data={{
+              name: session?.user?.name?.split(" ")[0] ?? "User",
+              currentWeight: latest?.weightKg ?? null,
+              startWeight: oldestWeight?.weightKg ?? null,
+              bmi: bmi > 0 ? bmi : null,
+              bmiLabel: bmi > 0 ? bmiLabel(bmi) : "",
+              streakDays: bestStreak,
+              habitsCount: habits.length,
+              daysTracking,
+              weightChange: totalChange,
+              goalWeight: targetWeightKg,
+            }}
+          />
+        </section>
+      )}
     </div>
   );
 }

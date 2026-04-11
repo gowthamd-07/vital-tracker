@@ -16,6 +16,12 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   /** Height in centimeters — used for BMI */
   heightCm: real("height_cm"),
+  /** Date of birth (YYYY-MM-DD) — used for age-based health calculations */
+  dateOfBirth: date("date_of_birth"),
+  /** Biological sex for BMR calculation: male | female */
+  gender: text("gender"),
+  /** Activity level for TDEE: sedentary | light | moderate | active | very_active */
+  activityLevel: text("activity_level"),
   /** Weight goal in kg */
   targetWeightKg: real("target_weight_kg"),
   /** Deadline to reach target weight (YYYY-MM-DD) */
