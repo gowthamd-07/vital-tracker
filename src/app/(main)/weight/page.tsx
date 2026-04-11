@@ -1,15 +1,20 @@
 import { getProfile } from "@/app/actions/profile";
+import { getHabitsWithCompletions } from "@/app/actions/habits";
 import { deleteWeightEntry, getWeightEntries, upsertWeightEntry } from "@/app/actions/weight";
 import { computeBmi, formatBmi, bmiLabel } from "@/lib/bmi";
+import { computeAge, computeBmr, computeTdee, computeHealthMetrics } from "@/lib/health";
+import type { Gender, ActivityLevel } from "@/lib/health";
 import { LazyWeightChart } from "@/components/lazy-weight-chart";
-import { todayIST, nowIST } from "@/lib/dates";
-import { Trash2, TrendingDown, TrendingUp, Minus, Target } from "lucide-react";
+import { todayIST, nowIST, daysBetween } from "@/lib/dates";
+import { findGymHabit } from "@/lib/gym-detect";
+import { Trash2, TrendingDown, TrendingUp, Minus, Target, Dumbbell, Zap } from "lucide-react";
 import Link from "next/link";
 
 export default async function WeightPage() {
-  const [profile, entries] = await Promise.all([
+  const [profile, entries, { habits, completions }] = await Promise.all([
     getProfile(),
     getWeightEntries(),
+    getHabitsWithCompletions(),
   ]);
   const height = profile?.heightCm ?? 0;
   const today = todayIST();
@@ -33,6 +38,44 @@ export default async function WeightPage() {
 
   const targetWeightKg = profile?.targetWeightKg ?? null;
   const targetDate = profile?.targetDate ?? null;
+
+  const gymHabit = findGymHabit(habits);
+  const gymDatesSet = new Set(
+    gymHabit
+      ? completions
+          .filter((c) => c.habitId === gymHabit.id)
+          .map((c) => c.completedDate)
+      : [],
+  );
+  const isGymToday = gymDatesSet.has(today);
+
+  const gymCalorieBurn = profile?.gymCalorieBurn ?? 0;
+  const hasFullProfile =
+    !!profile?.dateOfBirth && !!profile?.gender && !!profile?.activityLevel;
+  const healthMetrics =
+    hasFullProfile && latest && height > 0
+      ? computeHealthMetrics({
+          weightKg: latest.weightKg,
+          heightCm: height,
+          dateOfBirth: profile.dateOfBirth!,
+          gender: profile.gender as Gender,
+          activityLevel: profile.activityLevel as ActivityLevel,
+          targetWeightKg,
+          daysLeft: targetDate ? daysBetween(today, targetDate) : null,
+          gymCalorieBurn,
+          isGymDay: isGymToday,
+        })
+      : null;
+
+  // Per-row calorie computation helper
+  const canComputeCalories = hasFullProfile && height > 0;
+  const age = canComputeCalories ? computeAge(profile.dateOfBirth!) : 0;
+  function rowTdee(weightKg: number, isGym: boolean): number | null {
+    if (!canComputeCalories) return null;
+    const bmr = computeBmr(weightKg, height, age, profile!.gender as Gender);
+    const base = computeTdee(bmr, profile!.activityLevel as ActivityLevel);
+    return isGym ? base + gymCalorieBurn : base;
+  }
 
   return (
     <div className="space-y-8">
@@ -63,6 +106,38 @@ export default async function WeightPage() {
             <span className="font-semibold">{targetWeightKg} kg</span>
             {targetDate && <> by <span className="font-semibold">{targetDate}</span></>}
           </p>
+        </div>
+      )}
+
+      {/* ── Today's calorie plan ─────────────────────── */}
+      {healthMetrics && (
+        <div className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border px-4 py-3 ${
+          isGymToday
+            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30"
+            : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+        }`}>
+          <div className="flex items-center gap-2">
+            {isGymToday
+              ? <Dumbbell className="h-4 w-4 text-emerald-600" />
+              : <Zap className="h-4 w-4 text-yellow-500" />}
+            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              Today ({isGymToday ? "Gym" : "Rest"})
+            </span>
+          </div>
+          <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
+            TDEE <strong>{Math.round(healthMetrics.tdee)}</strong> kcal
+          </span>
+          {healthMetrics.targetCalories != null && (
+            <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
+              Target <strong>{Math.round(healthMetrics.targetCalories)}</strong> kcal
+            </span>
+          )}
+          {gymCalorieBurn > 0 && (
+            <span className="text-sm tabular-nums text-zinc-500">
+              Gym burn +{gymCalorieBurn} kcal ·{" "}
+              <Link href="/settings" className="text-emerald-700 hover:underline dark:text-emerald-400">Edit</Link>
+            </span>
+          )}
         </div>
       )}
 
@@ -171,6 +246,9 @@ export default async function WeightPage() {
                 <th className="px-3 py-3 font-medium text-zinc-700 sm:px-4 dark:text-zinc-300">Weight</th>
                 <th className="hidden px-4 py-3 font-medium text-zinc-700 sm:table-cell dark:text-zinc-300">Body fat</th>
                 <th className="hidden px-4 py-3 font-medium text-zinc-700 sm:table-cell dark:text-zinc-300">BMI</th>
+                {canComputeCalories && (
+                  <th className="hidden px-4 py-3 font-medium text-zinc-700 sm:table-cell dark:text-zinc-300">Calories</th>
+                )}
                 <th className="hidden px-4 py-3 font-medium text-zinc-700 md:table-cell dark:text-zinc-300">Notes</th>
                 <th className="w-12 px-2 py-3" />
               </tr>
@@ -178,17 +256,22 @@ export default async function WeightPage() {
             <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={canComputeCalories ? 7 : 6} className="px-4 py-8 text-center text-zinc-500">
                     No entries yet.
                   </td>
                 </tr>
               ) : (
                 entries.map((row) => {
                   const b = height > 0 ? computeBmi(row.weightKg, height) : 0;
+                  const isGymRow = gymDatesSet.has(row.entryDate);
+                  const tdeeVal = rowTdee(row.weightKg, isGymRow);
                   return (
-                    <tr key={row.id}>
+                    <tr key={row.id} className={isGymRow ? "bg-emerald-50/40 dark:bg-emerald-950/10" : ""}>
                       <td className="px-3 py-3 tabular-nums text-zinc-800 sm:px-4 dark:text-zinc-200">
-                        {row.entryDate}
+                        <span className="flex items-center gap-1.5">
+                          {row.entryDate}
+                          {isGymRow && <Dumbbell className="h-3.5 w-3.5 text-emerald-500" />}
+                        </span>
                       </td>
                       <td className="px-3 py-3 tabular-nums sm:px-4">
                         {row.weightKg.toFixed(1)} kg
@@ -196,6 +279,8 @@ export default async function WeightPage() {
                           {row.bodyFatPercent != null && `${row.bodyFatPercent.toFixed(1)}% BF`}
                           {height > 0 && row.bodyFatPercent != null && " · "}
                           {height > 0 && `BMI ${formatBmi(b)}`}
+                          {tdeeVal != null && ` · ${Math.round(tdeeVal)} kcal`}
+                          {isGymRow && gymCalorieBurn > 0 && ` (+${gymCalorieBurn})`}
                         </span>
                       </td>
                       <td className="hidden px-4 py-3 tabular-nums text-zinc-600 sm:table-cell dark:text-zinc-400">
@@ -209,6 +294,23 @@ export default async function WeightPage() {
                           </>
                         ) : "—"}
                       </td>
+                      {canComputeCalories && (
+                        <td className="hidden px-4 py-3 tabular-nums sm:table-cell">
+                          {tdeeVal != null ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className={isGymRow ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-zinc-700 dark:text-zinc-300"}>
+                                {Math.round(tdeeVal)}
+                              </span>
+                              <span className="text-xs text-zinc-500">kcal</span>
+                              {isGymRow && gymCalorieBurn > 0 && (
+                                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                                  +{gymCalorieBurn}
+                                </span>
+                              )}
+                            </span>
+                          ) : "—"}
+                        </td>
+                      )}
                       <td className="hidden max-w-[12rem] truncate px-4 py-3 text-zinc-600 md:table-cell dark:text-zinc-400">
                         {row.notes ?? "—"}
                       </td>

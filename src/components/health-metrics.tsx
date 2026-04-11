@@ -6,10 +6,21 @@ import {
   Heart,
   TrendingDown,
   Utensils,
+  Dumbbell,
 } from "lucide-react";
 import Link from "next/link";
 
-export function HealthMetricsPanel({ metrics }: { metrics: HealthMetrics }) {
+export function HealthMetricsPanel({
+  metrics,
+  gymHabitName,
+}: {
+  metrics: HealthMetrics;
+  gymHabitName?: string;
+}) {
+  const hasGym = metrics.gymDay != null;
+  const restTdee = metrics.restTdee;
+  const gymBurn = hasGym ? metrics.gymDay!.tdee - restTdee : 0;
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="mb-4 flex items-center justify-between">
@@ -23,6 +34,37 @@ export function HealthMetricsPanel({ metrics }: { metrics: HealthMetrics }) {
           Edit profile &rarr;
         </Link>
       </div>
+
+      {hasGym && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-sm text-emerald-800 dark:text-emerald-300">
+            {metrics.isGymDay ? (
+              <>
+                <span className="font-semibold">Gym day!</span>{" "}
+                Showing boosted TDEE (+{Math.round(gymBurn)} kcal).
+                {gymHabitName && (
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    {" "}&ldquo;{gymHabitName}&rdquo; is checked today.
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">Rest day.</span>{" "}
+                Check your{" "}
+                {gymHabitName ? (
+                  <>&ldquo;{gymHabitName}&rdquo; habit</>
+                ) : (
+                  <>gym habit</>
+                )}{" "}
+                to switch to gym-day calories (+{Math.round(gymBurn)} kcal).
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
         <MetricTile
           icon={<Fire className="h-5 w-5 text-orange-500" />}
@@ -31,13 +73,34 @@ export function HealthMetricsPanel({ metrics }: { metrics: HealthMetrics }) {
           unit="kcal/day"
           description="Base calories your body burns at rest"
         />
-        <MetricTile
-          icon={<Zap className="h-5 w-5 text-yellow-500" />}
-          label="TDEE"
-          value={`${Math.round(metrics.tdee)}`}
-          unit="kcal/day"
-          description="Total daily energy expenditure"
-        />
+        {hasGym ? (
+          <>
+            <MetricTile
+              icon={<Zap className={`h-5 w-5 ${metrics.isGymDay ? "text-zinc-400" : "text-yellow-500"}`} />}
+              label="TDEE (Rest)"
+              value={`${Math.round(restTdee)}`}
+              unit="kcal/day"
+              description="Non-gym day expenditure"
+              highlight={!metrics.isGymDay}
+            />
+            <MetricTile
+              icon={<Dumbbell className={`h-5 w-5 ${metrics.isGymDay ? "text-emerald-500" : "text-zinc-400"}`} />}
+              label="TDEE (Gym)"
+              value={`${Math.round(metrics.gymDay!.tdee)}`}
+              unit="kcal/day"
+              description="Gym day expenditure"
+              highlight={metrics.isGymDay}
+            />
+          </>
+        ) : (
+          <MetricTile
+            icon={<Zap className="h-5 w-5 text-yellow-500" />}
+            label="TDEE"
+            value={`${Math.round(metrics.tdee)}`}
+            unit="kcal/day"
+            description="Total daily energy expenditure"
+          />
+        )}
         <MetricTile
           icon={<Heart className="h-5 w-5 text-rose-500" />}
           label="Ideal weight"
@@ -58,7 +121,7 @@ export function HealthMetricsPanel({ metrics }: { metrics: HealthMetrics }) {
             label="Target calories"
             value={`${Math.round(metrics.targetCalories)}`}
             unit="kcal/day"
-            description="To reach your weight goal"
+            description={metrics.isGymDay ? "Gym day target to reach goal" : "Rest day target to reach goal"}
           />
         )}
         {metrics.dailyDeficit != null && (
@@ -81,20 +144,33 @@ function MetricTile({
   value,
   unit,
   description,
+  highlight,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   unit: string;
   description: string;
+  highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
+    <div
+      className={`rounded-xl border p-3 ${
+        highlight
+          ? "border-emerald-200 bg-emerald-50 ring-1 ring-emerald-300 dark:border-emerald-800 dark:bg-emerald-950/30 dark:ring-emerald-700"
+          : "border-zinc-100 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950"
+      }`}
+    >
       <div className="flex items-center gap-2">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           {label}
         </span>
+        {highlight && (
+          <span className="ml-auto rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+            TODAY
+          </span>
+        )}
       </div>
       <p className="mt-2 text-xl font-bold tabular-nums text-zinc-900 dark:text-zinc-50">
         {value}

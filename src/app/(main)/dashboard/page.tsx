@@ -13,6 +13,7 @@ import { HealthMetricsPanel, HealthMetricsEmpty } from "@/components/health-metr
 import { ProgressCard } from "@/components/progress-card";
 import Link from "next/link";
 import { todayIST, nowIST, daysBetween } from "@/lib/dates";
+import { findGymHabit } from "@/lib/gym-detect";
 import { analyzeGoal } from "@/lib/motivation";
 import {
   TrendingDown,
@@ -69,7 +70,28 @@ export default async function DashboardPage() {
   const targetDate = profile?.targetDate ?? null;
   const hasGoal = targetWeightKg != null && targetDate != null;
 
+  // Detect whether a gym-related habit was completed today
+  const gymHabit = findGymHabit(habits);
+  const isGymDay = gymHabit
+    ? completions.some(
+        (c) => c.habitId === gymHabit.id && c.completedDate === today,
+      )
+    : false;
+
   const oldestWeight = weights.length > 0 ? weights[weights.length - 1] : null;
+  const bestStreak = Math.max(0, ...habits.map((h) => h.bestStreak));
+
+  // Compute consecutive days with weight logged (from today backwards)
+  let weightLogStreak = 0;
+  {
+    const weightDates = new Set(weights.map((w) => w.entryDate));
+    const d = new Date(today + "T00:00:00Z");
+    while (weightDates.has(d.toISOString().slice(0, 10))) {
+      weightLogStreak++;
+      d.setDate(d.getDate() - 1);
+    }
+  }
+
   const goal = hasGoal
     ? analyzeGoal({
         currentWeight: latest?.weightKg ?? null,
@@ -77,6 +99,11 @@ export default async function DashboardPage() {
         targetWeight: targetWeightKg,
         targetDate,
         today,
+        name: session?.user?.name,
+        isGymDay,
+        gymCalorieBurn: profile?.gymCalorieBurn ?? 0,
+        bestStreak,
+        weightLogStreak,
       })
     : null;
 
@@ -94,6 +121,7 @@ export default async function DashboardPage() {
   // Health metrics
   const hasFullProfile =
     !!profile?.dateOfBirth && !!profile?.gender && !!profile?.activityLevel;
+  const gymCalorieBurn = profile?.gymCalorieBurn ?? 0;
   const healthMetrics =
     hasFullProfile && latest && height > 0
       ? computeHealthMetrics({
@@ -105,6 +133,8 @@ export default async function DashboardPage() {
           targetWeightKg,
           daysLeft:
             targetDate ? daysBetween(today, targetDate) : null,
+          gymCalorieBurn,
+          isGymDay,
         })
       : null;
 
@@ -122,7 +152,6 @@ export default async function DashboardPage() {
     oldestWeight && latest && weights.length > 1
       ? latest.weightKg - oldestWeight.weightKg
       : null;
-  const bestStreak = Math.max(0, ...habits.map((h) => h.bestStreak));
 
   return (
     <div className="space-y-8">
@@ -315,7 +344,7 @@ export default async function DashboardPage() {
 
       {/* ── Health insights ─────────────────────────── */}
       {healthMetrics ? (
-        <HealthMetricsPanel metrics={healthMetrics} />
+        <HealthMetricsPanel metrics={healthMetrics} gymHabitName={gymHabit?.name} />
       ) : (
         <HealthMetricsEmpty />
       )}

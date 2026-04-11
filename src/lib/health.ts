@@ -72,14 +72,41 @@ export function waterIntake(weightKg: number): number {
   return weightKg * 0.033;
 }
 
+export interface DayMetrics {
+  tdee: number;
+  dailyDeficit: number | null;
+  targetCalories: number | null;
+}
+
 export interface HealthMetrics {
   age: number;
   bmr: number;
+  /** Active TDEE for today (gym or rest depending on isGymDay) */
   tdee: number;
+  /** Baseline rest-day TDEE (always the non-gym value) */
+  restTdee: number;
   idealWeight: { min: number; max: number };
   waterLiters: number;
   dailyDeficit: number | null;
   targetCalories: number | null;
+  /** Present only when gymCalorieBurn > 0 */
+  gymDay: DayMetrics | null;
+  /** Which set of metrics applies today */
+  isGymDay: boolean;
+}
+
+function computeDeficitAndTarget(
+  tdee: number,
+  weightKg: number,
+  targetWeightKg: number | null | undefined,
+  daysLeft: number | null | undefined,
+): { deficit: number | null; targetCalories: number | null } {
+  if (targetWeightKg == null || daysLeft == null || daysLeft <= 0)
+    return { deficit: null, targetCalories: null };
+  const kgToLose = weightKg - targetWeightKg;
+  if (kgToLose <= 0) return { deficit: null, targetCalories: null };
+  const deficit = dailyCalorieDeficit(kgToLose, daysLeft);
+  return { deficit, targetCalories: Math.max(1200, tdee - deficit) };
 }
 
 export function computeHealthMetrics(opts: {
@@ -90,26 +117,41 @@ export function computeHealthMetrics(opts: {
   activityLevel: ActivityLevel;
   targetWeightKg?: number | null;
   daysLeft?: number | null;
+  gymCalorieBurn?: number | null;
+  isGymDay?: boolean;
 }): HealthMetrics {
   const age = computeAge(opts.dateOfBirth);
   const bmr = computeBmr(opts.weightKg, opts.heightCm, age, opts.gender);
-  const tdee = computeTdee(bmr, opts.activityLevel);
+  const restTdee = computeTdee(bmr, opts.activityLevel);
   const ideal = idealWeightRange(opts.heightCm);
   const water = waterIntake(opts.weightKg);
 
-  let deficit: number | null = null;
-  let targetCalories: number | null = null;
-  if (
-    opts.targetWeightKg != null &&
-    opts.daysLeft != null &&
-    opts.daysLeft > 0
-  ) {
-    const kgToLose = opts.weightKg - opts.targetWeightKg;
-    if (kgToLose > 0) {
-      deficit = dailyCalorieDeficit(kgToLose, opts.daysLeft);
-      targetCalories = Math.max(1200, tdee - deficit);
-    }
+  const gymBurn = opts.gymCalorieBurn ?? 0;
+  const isGymDay = opts.isGymDay ?? false;
+
+  const rest = computeDeficitAndTarget(restTdee, opts.weightKg, opts.targetWeightKg, opts.daysLeft);
+
+  let gymDay: DayMetrics | null = null;
+  if (gymBurn > 0) {
+    const gymTdee = restTdee + gymBurn;
+    const gym = computeDeficitAndTarget(gymTdee, opts.weightKg, opts.targetWeightKg, opts.daysLeft);
+    gymDay = { tdee: gymTdee, dailyDeficit: gym.deficit, targetCalories: gym.targetCalories };
   }
 
-  return { age, bmr, tdee, idealWeight: ideal, waterLiters: water, dailyDeficit: deficit, targetCalories };
+  const active = isGymDay && gymDay
+    ? gymDay
+    : { tdee: restTdee, dailyDeficit: rest.deficit, targetCalories: rest.targetCalories };
+
+  return {
+    age,
+    bmr,
+    tdee: active.tdee,
+    restTdee,
+    idealWeight: ideal,
+    waterLiters: water,
+    dailyDeficit: active.dailyDeficit,
+    targetCalories: active.targetCalories,
+    gymDay,
+    isGymDay,
+  };
 }

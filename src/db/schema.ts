@@ -1,6 +1,7 @@
 import {
   date,
   index,
+  integer,
   pgTable,
   real,
   text,
@@ -22,6 +23,8 @@ export const users = pgTable("users", {
   gender: text("gender"),
   /** Activity level for TDEE: sedentary | light | moderate | active | very_active */
   activityLevel: text("activity_level"),
+  /** Extra kcal burned on gym days (0 = no gym bonus) */
+  gymCalorieBurn: integer("gym_calorie_burn").default(0),
   /** Weight goal in kg */
   targetWeightKg: real("target_weight_kg"),
   /** Deadline to reach target weight (YYYY-MM-DD) */
