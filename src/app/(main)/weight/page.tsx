@@ -2,7 +2,8 @@ import { getProfile } from "@/app/actions/profile";
 import { deleteWeightEntry, getWeightEntries, upsertWeightEntry } from "@/app/actions/weight";
 import { computeBmi, formatBmi, bmiLabel } from "@/lib/bmi";
 import { LazyWeightChart } from "@/components/lazy-weight-chart";
-import { Trash2, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { todayIST, nowIST } from "@/lib/dates";
+import { Trash2, TrendingDown, TrendingUp, Minus, Target } from "lucide-react";
 import Link from "next/link";
 
 export default async function WeightPage() {
@@ -11,7 +12,7 @@ export default async function WeightPage() {
     getWeightEntries(),
   ]);
   const height = profile?.heightCm ?? 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIST();
 
   const chartData = entries
     .map((w) => ({
@@ -21,14 +22,17 @@ export default async function WeightPage() {
     }))
     .reverse();
 
-  // Trends
   const latest = entries[0];
-  const d7 = new Date(); d7.setDate(d7.getDate() - 7);
-  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const ist = nowIST();
+  const d7 = new Date(ist); d7.setDate(d7.getDate() - 7);
+  const d30 = new Date(ist); d30.setDate(d30.getDate() - 30);
   const weight7 = entries.find((w) => w.entryDate <= d7.toISOString().slice(0, 10));
   const weight30 = entries.find((w) => w.entryDate <= d30.toISOString().slice(0, 10));
   const change7 = latest && weight7 ? latest.weightKg - weight7.weightKg : null;
   const change30 = latest && weight30 ? latest.weightKg - weight30.weightKg : null;
+
+  const targetWeightKg = profile?.targetWeightKg ?? null;
+  const targetDate = profile?.targetDate ?? null;
 
   return (
     <div className="space-y-8">
@@ -48,6 +52,19 @@ export default async function WeightPage() {
           )}
         </p>
       </div>
+
+      {/* ── Goal summary ──────────────────────────────── */}
+      {targetWeightKg != null && latest && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30">
+          <Target className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            <span className="font-semibold">{Math.abs(latest.weightKg - targetWeightKg).toFixed(1)} kg</span>
+            {" "}away from your goal of{" "}
+            <span className="font-semibold">{targetWeightKg} kg</span>
+            {targetDate && <> by <span className="font-semibold">{targetDate}</span></>}
+          </p>
+        </div>
+      )}
 
       {/* ── Trend summary ─────────────────────────────── */}
       {latest && (
@@ -77,7 +94,7 @@ export default async function WeightPage() {
         <h2 className="mb-4 text-lg font-medium text-zinc-900 dark:text-zinc-50">
           Weight over time
         </h2>
-        <LazyWeightChart data={chartData} height={300} showBodyFat />
+        <LazyWeightChart data={chartData} height={300} showBodyFat targetWeight={targetWeightKg ?? undefined} />
       </section>
 
       {/* ── Add form ──────────────────────────────────── */}

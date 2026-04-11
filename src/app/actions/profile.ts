@@ -16,6 +16,8 @@ export async function getProfile() {
       email: users.email,
       name: users.name,
       heightCm: users.heightCm,
+      targetWeightKg: users.targetWeightKg,
+      targetDate: users.targetDate,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
@@ -30,6 +32,8 @@ export async function updateProfile(formData: FormData): Promise<void> {
 
   const name = String(formData.get("name") ?? "").trim();
   const heightRaw = String(formData.get("heightCm") ?? "").trim();
+  const targetWeightRaw = String(formData.get("targetWeightKg") ?? "").trim();
+  const targetDateRaw = String(formData.get("targetDate") ?? "").trim();
 
   if (!name) return;
 
@@ -40,9 +44,18 @@ export async function updateProfile(formData: FormData): Promise<void> {
     heightCm = h;
   }
 
+  let targetWeightKg: number | null = null;
+  if (targetWeightRaw) {
+    const tw = parseFloat(targetWeightRaw);
+    if (Number.isNaN(tw) || tw < 20 || tw > 400) return;
+    targetWeightKg = tw;
+  }
+
+  const targetDate: string | null = targetDateRaw || null;
+
   await db
     .update(users)
-    .set({ name, heightCm })
+    .set({ name, heightCm, targetWeightKg, targetDate })
     .where(eq(users.id, session.user.id));
 
   revalidatePath("/settings");

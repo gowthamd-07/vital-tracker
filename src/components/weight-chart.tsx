@@ -22,10 +22,12 @@ export function WeightChart({
   data,
   height = 280,
   showBodyFat = false,
+  targetWeight,
 }: {
   data: Point[];
   height?: number;
   showBodyFat?: boolean;
+  targetWeight?: number;
 }) {
   if (data.length === 0) {
     return (
@@ -39,8 +41,9 @@ export function WeightChart({
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
   const weights = sorted.map((d) => d.weight);
-  const minW = Math.floor(Math.min(...weights) - 2);
-  const maxW = Math.ceil(Math.max(...weights) + 2);
+  const allValues = targetWeight != null ? [...weights, targetWeight] : weights;
+  const minW = Math.floor(Math.min(...allValues) - 2);
+  const maxW = Math.ceil(Math.max(...allValues) + 2);
   const avg = weights.reduce((s, w) => s + w, 0) / weights.length;
 
   const hasBodyFat = showBodyFat && sorted.some((d) => d.bodyFat != null);
@@ -99,6 +102,21 @@ export function WeightChart({
             strokeDasharray="6 4"
             strokeOpacity={0.5}
           />
+          {targetWeight != null && (
+            <ReferenceLine
+              y={targetWeight}
+              stroke="#f59e0b"
+              strokeDasharray="8 4"
+              strokeWidth={1.5}
+              label={{
+                value: `Goal ${targetWeight}`,
+                position: "right",
+                fill: "#f59e0b",
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            />
+          )}
           <Area
             type="monotone"
             dataKey="weight"
@@ -121,6 +139,12 @@ export function WeightChart({
           <span className="inline-block h-px w-4 border-t border-dashed border-zinc-400" />
           Avg {avg.toFixed(1)} kg
         </span>
+        {targetWeight != null && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-px w-4 border-t border-dashed border-amber-500" />
+            Goal {targetWeight} kg
+          </span>
+        )}
         {hasBodyFat && (
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-4 rounded bg-violet-500" />

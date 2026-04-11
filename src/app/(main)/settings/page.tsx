@@ -11,8 +11,7 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="mt-1 text-zinc-600 dark:text-zinc-400">
-          Your profile and BMI height. Height is used to compute BMI from weight
-          entries.
+          Your profile, BMI height, and weight goal.
         </p>
       </div>
 
@@ -55,9 +54,49 @@ export default async function SettingsPage() {
               className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50"
             />
             <span className="mt-1 block text-xs text-zinc-500">
-              Leave empty if you only want to track weight without BMI.
+              Used to compute BMI from weight entries.
             </span>
           </label>
+
+          <div className="border-t border-zinc-200 pt-4 dark:border-zinc-700">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Weight goal
+            </h3>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              Set a target weight and deadline to get motivational tracking on
+              your dashboard.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Target weight (kg)
+              <input
+                type="number"
+                name="targetWeightKg"
+                min={20}
+                max={400}
+                step="0.1"
+                placeholder="e.g. 70"
+                defaultValue={
+                  profile?.targetWeightKg != null
+                    ? String(profile.targetWeightKg)
+                    : ""
+                }
+                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50"
+              />
+            </label>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Target date
+              <input
+                type="date"
+                name="targetDate"
+                defaultValue={profile?.targetDate ?? ""}
+                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50"
+              />
+            </label>
+          </div>
+
           <button
             type="submit"
             className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"

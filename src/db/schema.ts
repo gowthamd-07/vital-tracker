@@ -16,6 +16,10 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   /** Height in centimeters — used for BMI */
   heightCm: real("height_cm"),
+  /** Weight goal in kg */
+  targetWeightKg: real("target_weight_kg"),
+  /** Deadline to reach target weight (YYYY-MM-DD) */
+  targetDate: date("target_date"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

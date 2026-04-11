@@ -6,7 +6,9 @@ import { computeBmi, formatBmi, bmiLabel } from "@/lib/bmi";
 import { LazyWeightChart } from "@/components/lazy-weight-chart";
 import { DashboardHabits } from "@/components/dashboard-habits";
 import Link from "next/link";
-import { TrendingDown, TrendingUp, Minus, Scale, Activity } from "lucide-react";
+import { todayIST, nowIST } from "@/lib/dates";
+import { analyzeGoal } from "@/lib/motivation";
+import { TrendingDown, TrendingUp, Minus, Scale, Activity, Target, Zap } from "lucide-react";
 
 export default async function DashboardPage() {
   const [session, profile, weights, { habits, completions }] =
@@ -21,10 +23,11 @@ export default async function DashboardPage() {
   const height = profile?.heightCm ?? 0;
   const bmi = latest && height > 0 ? computeBmi(latest.weightKg, height) : 0;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIST();
 
-  const d7 = new Date(); d7.setDate(d7.getDate() - 7);
-  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const ist = nowIST();
+  const d7 = new Date(ist); d7.setDate(d7.getDate() - 7);
+  const d30 = new Date(ist); d30.setDate(d30.getDate() - 30);
   const d7Str = d7.toISOString().slice(0, 10);
   const d30Str = d30.toISOString().slice(0, 10);
 
@@ -43,6 +46,32 @@ export default async function DashboardPage() {
     }))
     .reverse();
 
+  const targetWeightKg = profile?.targetWeightKg ?? null;
+  const targetDate = profile?.targetDate ?? null;
+  const hasGoal = targetWeightKg != null && targetDate != null;
+
+  const oldestWeight = weights.length > 0 ? weights[weights.length - 1] : null;
+  const goal = hasGoal
+    ? analyzeGoal({
+        currentWeight: latest?.weightKg ?? null,
+        startWeight: oldestWeight?.weightKg ?? null,
+        targetWeight: targetWeightKg,
+        targetDate,
+        today,
+      })
+    : null;
+
+  const statusColor =
+    goal?.status === "reached"
+      ? "emerald"
+      : goal?.status === "on_track"
+        ? "emerald"
+        : goal?.status === "behind"
+          ? "amber"
+          : goal?.status === "far_behind"
+            ? "red"
+            : "zinc";
+
   return (
     <div className="space-y-8">
       <div>
@@ -53,6 +82,91 @@ export default async function DashboardPage() {
           Your health snapshot for today.
         </p>
       </div>
+
+      {/* ── Weight goal motivation ────────────────────────── */}
+      {hasGoal && goal ? (
+        <section
+          className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${
+            statusColor === "emerald"
+              ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30"
+              : statusColor === "amber"
+                ? "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"
+                : statusColor === "red"
+                  ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30"
+                  : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`mt-0.5 rounded-full p-2 ${
+                statusColor === "emerald"
+                  ? "bg-emerald-100 dark:bg-emerald-900/50"
+                  : statusColor === "amber"
+                    ? "bg-amber-100 dark:bg-amber-900/50"
+                    : statusColor === "red"
+                      ? "bg-red-100 dark:bg-red-900/50"
+                      : "bg-zinc-100 dark:bg-zinc-800"
+              }`}
+            >
+              {goal.status === "reached" ? (
+                <Zap className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Target className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                {goal.message}
+              </p>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {goal.sub}
+              </p>
+              {goal.progressPct > 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span>Progress</span>
+                    <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                      {goal.progressPct}%
+                    </span>
+                  </div>
+                  <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        statusColor === "emerald"
+                          ? "bg-emerald-500"
+                          : statusColor === "amber"
+                            ? "bg-amber-500"
+                            : "bg-red-500"
+                      }`}
+                      style={{ width: `${goal.progressPct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-dashed border-zinc-300 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="flex items-center gap-3">
+            <Target className="h-5 w-5 text-zinc-400" />
+            <div>
+              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                No weight goal set
+              </p>
+              <p className="text-xs text-zinc-500">
+                <Link
+                  href="/settings"
+                  className="font-medium text-emerald-700 underline dark:text-emerald-400"
+                >
+                  Set a target weight &amp; date
+                </Link>{" "}
+                to get motivational tracking here.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Stats cards ─────────────────────────────────── */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -100,7 +214,7 @@ export default async function DashboardPage() {
             View all &rarr;
           </Link>
         </div>
-        <LazyWeightChart data={chartData} showBodyFat />
+        <LazyWeightChart data={chartData} showBodyFat targetWeight={targetWeightKg ?? undefined} />
       </section>
 
       {/* ── Today's habits (optimistic client component) ── */}

@@ -1,17 +1,19 @@
+import { nowIST } from "./dates";
+
 /**
  * Compute the current streak for a habit.
- * Walk backwards from today; if today is not done, allow yesterday as start.
+ * Walk backwards from today (IST); if today is not done, allow yesterday as start.
  */
 export function computeStreak(completionDates: Set<string>): number {
   let streak = 0;
-  const d = new Date();
-  const todayStr = isoDate(d);
+  const d = nowIST();
+  const todayStr = d.toISOString().slice(0, 10);
 
   if (!completionDates.has(todayStr)) {
     d.setDate(d.getDate() - 1);
   }
 
-  while (completionDates.has(isoDate(d))) {
+  while (completionDates.has(d.toISOString().slice(0, 10))) {
     streak++;
     d.setDate(d.getDate() - 1);
   }
@@ -19,9 +21,7 @@ export function computeStreak(completionDates: Set<string>): number {
   return streak;
 }
 
-/**
- * Best (longest) streak ever recorded.
- */
+/** Best (longest) streak ever recorded. */
 export function longestStreak(completionDates: string[]): number {
   if (completionDates.length === 0) return 0;
   const sorted = [...completionDates].sort();
@@ -41,8 +41,4 @@ export function longestStreak(completionDates: string[]): number {
     }
   }
   return best;
-}
-
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
