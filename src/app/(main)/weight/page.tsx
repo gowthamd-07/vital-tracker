@@ -1,5 +1,6 @@
 import { getProfile } from "@/app/actions/profile";
 import { getHabitsWithCompletions } from "@/app/actions/habits";
+import { updateGymCalorieBurn } from "@/app/actions/profile";
 import { deleteWeightEntry, getWeightEntries, upsertWeightEntry } from "@/app/actions/weight";
 import { computeBmi, formatBmi, bmiLabel } from "@/lib/bmi";
 import { computeAge, computeBmr, computeTdee, computeHealthMetrics } from "@/lib/health";
@@ -134,12 +135,50 @@ export default async function WeightPage() {
           )}
           {gymCalorieBurn > 0 && (
             <span className="text-sm tabular-nums text-zinc-500">
-              Gym burn +{gymCalorieBurn} kcal ·{" "}
-              <Link href="/settings" className="text-emerald-700 hover:underline dark:text-emerald-400">Edit</Link>
+              Gym burn +{gymCalorieBurn} kcal
             </span>
           )}
         </div>
       )}
+
+      {/* ── Gym day bonus ──────────────────────────────── */}
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex items-center gap-2">
+          <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+            Gym day bonus
+          </h2>
+        </div>
+        <p className="mt-1 text-xs text-zinc-500">
+          Extra calories burned during a typical workout. On days you
+          check a &ldquo;Gym&rdquo; habit, your TDEE and calorie targets
+          adjust automatically.
+        </p>
+        <form action={updateGymCalorieBurn} className="mt-3 flex items-end gap-3">
+          <label className="block max-w-xs text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Workout calorie burn (kcal)
+            <input
+              type="number"
+              name="gymCalorieBurn"
+              min={0}
+              max={2000}
+              step={50}
+              placeholder="e.g. 400"
+              defaultValue={gymCalorieBurn > 0 ? String(gymCalorieBurn) : ""}
+              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+          >
+            Save
+          </button>
+        </form>
+        <span className="mt-1.5 block text-xs text-zinc-500">
+          Leave empty or 0 if you don&apos;t want gym-day adjustments.
+        </span>
+      </section>
 
       {/* ── Trend summary ─────────────────────────────── */}
       {latest && (

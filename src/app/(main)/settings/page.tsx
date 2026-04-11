@@ -117,38 +117,6 @@ export default async function SettingsPage() {
 
           <div className="border-t border-zinc-200 pt-5 dark:border-zinc-700">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Gym day bonus
-            </h3>
-            <p className="mt-0.5 text-xs text-zinc-500">
-              Extra calories burned during a typical workout. On days you
-              check a &ldquo;Gym&rdquo; habit, your TDEE and calorie
-              targets adjust automatically.
-            </p>
-          </div>
-
-          <label className="block max-w-xs text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Workout calorie burn (kcal)
-            <input
-              type="number"
-              name="gymCalorieBurn"
-              min={0}
-              max={2000}
-              step={50}
-              placeholder="e.g. 400"
-              defaultValue={
-                profile?.gymCalorieBurn
-                  ? String(profile.gymCalorieBurn)
-                  : ""
-              }
-              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-50"
-            />
-            <span className="mt-1 block text-xs text-zinc-500">
-              Leave empty or 0 if you don&apos;t want gym-day adjustments.
-            </span>
-          </label>
-
-          <div className="border-t border-zinc-200 pt-5 dark:border-zinc-700">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               Weight goal
             </h3>
             <p className="mt-0.5 text-xs text-zinc-500">
