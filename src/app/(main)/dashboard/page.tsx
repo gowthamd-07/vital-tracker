@@ -20,6 +20,8 @@ import {
   Minus,
   Scale,
   Activity,
+  Target,
+  Zap,
 } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -89,6 +91,70 @@ export default async function DashboardPage() {
     }
   }
 
+  // Goal status computation (factual, no motivational quotes)
+  let goalStatus: "reached" | "deadline_passed" | "on_track" | "behind" | "far_behind" | "no_data" = "no_data";
+  let goalMessage = "";
+  let goalSub = "";
+  let goalProgressPct = 0;
+  let goalRemaining = 0;
+  let goalDaysLeft = 0;
+  let goalRequiredPerWeek: number | null = null;
+
+  if (hasGoal && latest) {
+    const startW = oldestWeight?.weightKg ?? latest.weightKg;
+    const currentW = latest.weightKg;
+    const totalToLose = startW - targetWeightKg;
+    const lostSoFar = startW - currentW;
+    const remaining = currentW - targetWeightKg;
+    const isLosing = totalToLose > 0;
+
+    const absTotal = Math.abs(totalToLose);
+    const absRemaining = Math.abs(remaining);
+    goalProgressPct = absTotal > 0
+      ? Math.min(100, Math.max(0, Math.round(((isLosing ? lostSoFar : -lostSoFar) / absTotal) * 100)))
+      : 0;
+    goalRemaining = absRemaining;
+    goalDaysLeft = daysBetween(today, targetDate);
+    const weeksLeft = Math.max(0, goalDaysLeft / 7);
+    goalRequiredPerWeek = weeksLeft > 0 ? absRemaining / weeksLeft : null;
+
+    if ((isLosing && currentW <= targetWeightKg) || (!isLosing && currentW >= targetWeightKg)) {
+      goalStatus = "reached";
+      goalMessage = "Goal reached!";
+      goalSub = `Current: ${currentW.toFixed(1)} kg — Goal was ${targetWeightKg} kg.`;
+    } else if (goalDaysLeft < 0) {
+      goalStatus = "deadline_passed";
+      goalMessage = `${absRemaining.toFixed(1)} kg away — deadline passed.`;
+      goalSub = `Deadline was ${targetDate}. Set a new date to continue tracking.`;
+    } else if (goalRequiredPerWeek != null && goalRequiredPerWeek <= 0.5) {
+      goalStatus = "on_track";
+      goalMessage = `On track! ${absRemaining.toFixed(1)} kg to go.`;
+      goalSub = `${goalDaysLeft} days left · ${goalRequiredPerWeek.toFixed(2)} kg/week needed`;
+    } else if (goalRequiredPerWeek != null && goalRequiredPerWeek <= 1.0) {
+      goalStatus = "behind";
+      goalMessage = `Behind schedule. ${absRemaining.toFixed(1)} kg to go.`;
+      goalSub = `${goalDaysLeft} days left · ${goalRequiredPerWeek.toFixed(2)} kg/week needed`;
+    } else {
+      goalStatus = "far_behind";
+      goalMessage = `Far behind. ${absRemaining.toFixed(1)} kg to go.`;
+      goalSub = `${goalDaysLeft} days left · ${goalRequiredPerWeek ? goalRequiredPerWeek.toFixed(2) : "—"} kg/week needed`;
+    }
+  } else if (hasGoal && !latest) {
+    goalMessage = "Log your first weight to see goal progress.";
+    goalSub = `Target: ${targetWeightKg} kg by ${targetDate}`;
+  }
+
+  const statusColor =
+    goalStatus === "reached"
+      ? "emerald"
+      : goalStatus === "on_track"
+        ? "emerald"
+        : goalStatus === "behind"
+          ? "amber"
+          : goalStatus === "far_behind"
+            ? "red"
+            : "zinc";
+
   // Health metrics
   const hasFullProfile =
     !!profile?.dateOfBirth && !!profile?.gender && !!profile?.activityLevel;
@@ -153,6 +219,91 @@ export default async function DashboardPage() {
 
       {/* ── Quick log today's weight ─────────────────── */}
       <QuickLog today={today} action={upsertWeightEntry} hasToday={hasLoggedToday} />
+
+      {/* ── Weight goal banner ────────────────────── */}
+      {hasGoal && latest ? (
+        <section
+          className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${
+            statusColor === "emerald"
+              ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30"
+              : statusColor === "amber"
+                ? "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"
+                : statusColor === "red"
+                  ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30"
+                  : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`mt-0.5 rounded-full p-2 ${
+                statusColor === "emerald"
+                  ? "bg-emerald-100 dark:bg-emerald-900/50"
+                  : statusColor === "amber"
+                    ? "bg-amber-100 dark:bg-amber-900/50"
+                    : statusColor === "red"
+                      ? "bg-red-100 dark:bg-red-900/50"
+                      : "bg-zinc-100 dark:bg-zinc-800"
+              }`}
+            >
+              {goalStatus === "reached" ? (
+                <Zap className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Target className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                {goalMessage}
+              </p>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {goalSub}
+              </p>
+              {goalProgressPct > 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span>Progress</span>
+                    <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                      {goalProgressPct}%
+                    </span>
+                  </div>
+                  <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        statusColor === "emerald"
+                          ? "bg-emerald-500"
+                          : statusColor === "amber"
+                            ? "bg-amber-500"
+                            : "bg-red-500"
+                      }`}
+                      style={{ width: `${goalProgressPct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : !hasGoal ? (
+        <section className="rounded-2xl border border-dashed border-zinc-300 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="flex items-center gap-3">
+            <Target className="h-5 w-5 text-zinc-400" />
+            <div>
+              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                No weight goal set
+              </p>
+              <p className="text-xs text-zinc-500">
+                <Link
+                  href="/settings"
+                  className="font-medium text-emerald-700 underline dark:text-emerald-400"
+                >
+                  Set a target weight &amp; date
+                </Link>{" "}
+                to get tracking here.
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* ── Stats cards ─────────────────────────────── */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
